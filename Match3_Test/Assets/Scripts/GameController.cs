@@ -9,17 +9,20 @@ public class GameController : MonoBehaviour
 {
     private int length = 8;
     
+    [Header("GameObjects")]
     [SerializeField] private Point basicPoint;
-
     [SerializeField] private GameObject pointParent;
-
     [SerializeField] private Canvas mainCanvas;
-
     [SerializeField] private Image inputBLocker;
-
+    
     private List<List<Point>> pointList = new List<List<Point>>();
-
+    
+    [Header("Counters")]
     private int clicksNumber;
+    private float timeSpent;
+    private int playerScore;
+
+    private List<Point> selectedPoints = new List<Point>();
 
     private void Start()
     {
@@ -41,22 +44,28 @@ public class GameController : MonoBehaviour
         }
     }
 
-    private async void ClicksCount()
+    private async void ClicksCount(Point newPoint)
     {
         clicksNumber++;
+        selectedPoints.Add(newPoint);
         if (clicksNumber > 1)
         {
             inputBLocker.gameObject.SetActive(true);
             clicksNumber = 0;
-            foreach (var points in pointList)
+            if (selectedPoints[0].IsNear(selectedPoints[1]))
             {
-                foreach (var point in points)
+                Debug.Log("Boom");
+            }
+            else
+            {
+                foreach (var point in selectedPoints)
                 {
                     point.Deselect();
                 }
+                await Task.Delay(TimeSpan.FromSeconds(1f));
+                inputBLocker.gameObject.SetActive(false);
             }
-            await Task.Delay(TimeSpan.FromSeconds(1f));
-            inputBLocker.gameObject.SetActive(false);
+            selectedPoints.Clear();
         }
     }
 

@@ -17,29 +17,48 @@ public enum Shape
 
 public class Point : MonoBehaviour
 {
-    public event Action Selected;
+    public event Action<Point> Selected;
 
     [HideInInspector] public int x;
     [HideInInspector] public int y;
 
     [SerializeField] private Image image;
-
     [SerializeField] private List<Sprite> iconList;
-
     [SerializeField] private Button button;
 
     private Shape pointShape;
 
     private bool isSelected;
-
     private bool isScaled;
 
     private CancellationTokenSource selectedToken = new CancellationTokenSource();
     private CancellationTokenSource deselectedToken = new CancellationTokenSource();
 
+    private Vector2 startingPosition;
+
     public Shape GetShape()
     {
         return pointShape;
+    }
+    
+    public bool IsEqual(Point point)
+    {
+        return point.x == x && point.y == y;
+    }
+
+    public bool IsSelected()
+    {
+        return isSelected;
+    }
+
+    public bool IsNear(Point point)
+    {
+        return Math.Abs(point.x - x) < 2 && Math.Abs(point.y - y) < 2;
+    }
+
+    public void SetNewStartingPosition(Vector2 newPosition)
+    {
+        startingPosition = newPosition;
     }
 
     public void Setup(int x1, int y1)
@@ -49,21 +68,9 @@ public class Point : MonoBehaviour
         image.sprite = iconList[setupInt];
         x = x1;
         y = y1;
+        startingPosition = transform.position;
     }
-
-    public bool IsEqual(Point point)
-    {
-        return point.x == x && point.y == y;
-    }
-
-    private void Select()
-    {
-        if (isSelected) return;
-        Selected?.Invoke();
-        isSelected = true;
-        ShowSelection();
-    }
-
+    
     public async void Deselect()
     {
         await Task.Delay(TimeSpan.FromSeconds(0.5f));
@@ -85,6 +92,19 @@ public class Point : MonoBehaviour
         isSelected = false;
         selectedToken?.Cancel();
         deselectedToken?.Cancel();
+    }
+
+    public void TryMove()
+    {
+        
+    }
+    
+    private void Select()
+    {
+        if (isSelected) return;
+        Selected?.Invoke(this);
+        isSelected = true;
+        ShowSelection();
     }
 
     private async void ShowSelection()
