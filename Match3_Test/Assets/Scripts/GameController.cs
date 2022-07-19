@@ -1,7 +1,7 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Progress;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -14,16 +14,16 @@ public class GameController : MonoBehaviour
     [SerializeField] private GameObject pointParent;
     [SerializeField] private Canvas mainCanvas;
     [SerializeField] private Image inputBLocker;
+
+    [Header("Components")] 
+    [SerializeField] private ProgressModel progressModel;
+    [SerializeField] private ProgressView progressView;
     
     private List<List<Point>> pointList = new List<List<Point>>();
-    
-    [Header("Counters")]
-    private int clicksNumber;
-    private float timeSpent;
-    private int playerScore;
-
     private List<Point> selectedPoints = new List<Point>();
-
+    
+    private int clicksNumber;
+    
     private void Start()
     {
         inputBLocker.gameObject.SetActive(false);
@@ -39,10 +39,10 @@ public class GameController : MonoBehaviour
                 newPoint.transform.position = 
                     new Vector2(-350 + j*100 + pixelRect.width/2,350 - i*100 + pixelRect.height/2);
                 newPoint.Selected += TrySelect;
+                newPoint.ScoreDetonate += progressModel.CountScore;
                 newList.Add(newPoint);
             }
         }
-
         do {
             for (var i = 0; i < length; i++)
             {
@@ -53,6 +53,9 @@ public class GameController : MonoBehaviour
                 }
             }
         } while (TryDetonate(true));
+        progressModel.TimeCountdown += progressView.RenderTime;
+        progressModel.ScoreEvent += progressView.RenderScore;
+        progressModel.GameOver += GameOver;
     }
 
     private async void TrySelect(Point newPoint)
@@ -177,6 +180,11 @@ public class GameController : MonoBehaviour
         return hasDetonated;
     }
 
+    private void GameOver()
+    {
+        inputBLocker.gameObject.SetActive(true);
+    }
+
     private void OnDestroy()
     {
         foreach (var points in pointList)
@@ -184,7 +192,11 @@ public class GameController : MonoBehaviour
             foreach (var point in points)
             {
                 point.Selected -= TrySelect;
+                point.ScoreDetonate -= progressModel.CountScore;
             }
         }
+        progressModel.TimeCountdown -= progressView.RenderTime;
+        progressModel.ScoreEvent -= progressView.RenderScore;
+        progressModel.GameOver -= GameOver;
     }
 }

@@ -19,7 +19,6 @@ public enum Shape
 public class Point : MonoBehaviour
 {
     public event Action<Point> Selected;
-
     public event Action ScoreDetonate;
 
     [HideInInspector] public int x;
@@ -88,8 +87,8 @@ public class Point : MonoBehaviour
     public async void Detonate()
     {
         image.color = Color.clear;
-        ScoreDetonate?.Invoke();
         await Task.Delay(TimeSpan.FromSeconds(1f));
+        ScoreDetonate?.Invoke();
     }
     
     public async void Deselect()
