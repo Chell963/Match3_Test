@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 using Random = UnityEngine.Random;
 
@@ -19,6 +20,8 @@ public class Point : MonoBehaviour
 {
     public event Action<Point> Selected;
 
+    public event Action ScoreDetonate;
+
     [HideInInspector] public int x;
     [HideInInspector] public int y;
 
@@ -26,20 +29,18 @@ public class Point : MonoBehaviour
     [SerializeField] private List<Sprite> iconList;
     [SerializeField] private Button button;
 
-    private Shape pointShape;
+    public Shape shape;
 
     private bool isSelected;
     private bool isScaled;
+    private bool isToDetonate;
 
     private CancellationTokenSource selectedToken = new CancellationTokenSource();
     private CancellationTokenSource deselectedToken = new CancellationTokenSource();
+    private CancellationTokenSource movingToken = new CancellationTokenSource();
 
+    private Vector2 scaleVector = new Vector2(1.25f, 1.25f);
     private Vector2 startingPosition;
-
-    public Shape GetShape()
-    {
-        return pointShape;
-    }
     
     public bool IsEqual(Point point)
     {
@@ -50,40 +51,56 @@ public class Point : MonoBehaviour
     {
         return isSelected;
     }
+    
+    public bool IsDetonating()
+    {
+        return isToDetonate;
+    }
+
+    public void SetDetonate(bool isDetonate)
+    {
+        isToDetonate = isDetonate;
+    }
 
     public bool IsNear(Point point)
     {
-        return Math.Abs(point.x - x) < 2 && Math.Abs(point.y - y) < 2;
+        return (Math.Abs(point.x - x) == 1 && Math.Abs(point.y - y) == 0) 
+               || (Math.Abs(point.x - x) == 0 && Math.Abs(point.y - y) == 1);
     }
-
-    public void SetNewStartingPosition(Vector2 newPosition)
-    {
-        startingPosition = newPosition;
-    }
-
+    
     public void Setup(int x1, int y1)
     {
         var setupInt = Random.Range(0, 5);
-        pointShape = (Shape)setupInt;
+        shape = (Shape)setupInt;
         image.sprite = iconList[setupInt];
         x = x1;
         y = y1;
         startingPosition = transform.position;
     }
+
+    public void Swap(Point pointToSwap)
+    {
+        (x, pointToSwap.x) = (pointToSwap.x, x);
+        (y, pointToSwap.y) = (pointToSwap.y, y);
+        (shape, pointToSwap.shape) = (pointToSwap.shape, shape);
+    }
+
+    public async void Detonate()
+    {
+        image.color = Color.clear;
+        ScoreDetonate?.Invoke();
+        await Task.Delay(TimeSpan.FromSeconds(1f));
+    }
     
     public async void Deselect()
     {
-        await Task.Delay(TimeSpan.FromSeconds(0.5f));
-        selectedToken?.Cancel();
         deselectedToken = new CancellationTokenSource();
         float lerp = 0;
         var oldScale = gameObject.transform.localScale;
         while (lerp < 1)
         {
-            if (deselectedToken.IsCancellationRequested)
-            {
-                return;
-            }
+            if (deselectedToken.IsCancellationRequested) return;
+            selectedToken?.Cancel();
             gameObject.transform.localScale = Vector3.Lerp(oldScale, Vector3.one, lerp);
             lerp += Time.deltaTime * 2;
             await Task.Yield();
@@ -94,9 +111,40 @@ public class Point : MonoBehaviour
         deselectedToken?.Cancel();
     }
 
-    public void TryMove()
+    public async void TryMove(Vector3 newPosition, bool isNewStartingPosition)
     {
-        
+        if (isNewStartingPosition)
+        {
+            startingPosition = newPosition;
+        }
+        else
+        {
+            float scaleLerp = 0;
+            var vectorTwo = scaleVector;
+            var oldScale = gameObject.transform.localScale;
+            while (scaleLerp < 1)
+            {
+                if (movingToken.IsCancellationRequested) return;
+                selectedToken?.Cancel();
+                gameObject.transform.localScale = Vector3.Lerp(oldScale, vectorTwo, scaleLerp);
+                scaleLerp += Time.deltaTime * 3;
+                await Task.Yield();
+            }
+        }
+        float movingLerp = 0;
+        var oldPosition = gameObject.transform.position;
+        while (movingLerp < 1)
+        {
+            if (movingToken.IsCancellationRequested) return;
+            while (movingLerp < 1)
+            {
+                if (movingToken.IsCancellationRequested) return;
+                gameObject.transform.position = Vector3.Lerp(oldPosition, newPosition, movingLerp);
+                movingLerp += Time.deltaTime * 2;
+                await Task.Yield();
+            }
+            movingLerp += Time.deltaTime;
+        }
     }
     
     private void Select()
@@ -110,7 +158,7 @@ public class Point : MonoBehaviour
     private async void ShowSelection()
     {
         float lerp = 0;
-        var vectorTwo = new Vector3(1.5f, 1.5f, 1.5f);
+        var vectorTwo = scaleVector;
         selectedToken = new CancellationTokenSource();
         while (lerp < 1)
         {
