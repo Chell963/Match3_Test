@@ -68,7 +68,7 @@ public class GameController : MonoBehaviour
             clicksNumber = 0;
             if (selectedPoints[0].IsNear(selectedPoints[1]))
             {
-                await MarkDetonate();
+                await DetonateRound();
             }
             foreach (var point in selectedPoints)
             {
@@ -80,35 +80,38 @@ public class GameController : MonoBehaviour
         }
     }
 
-    private async Task MarkDetonate()
+    private async Task DetonateRound()
     {
         var sp0 = selectedPoints[0];
         var sp1 = selectedPoints[1];
-        sp0.TryMove(sp1.transform.position, false);
-        sp1.TryMove(sp0.transform.position, false);
-        sp0.Swap(sp1);
+        sp0.TryMove(sp1.transform.position,false,false);
+        sp1.TryMove(sp0.transform.position,false,false);
+        PointSwap(sp0, sp1);
         await Task.Delay(TimeSpan.FromSeconds(1f));
         CheckColumn(sp1.x, sp1.y);
         CheckColumn(sp0.x, sp0.y);
         CheckRow(sp1.x, sp1.y);
         CheckRow(sp0.x, sp0.y);
-        if (!(sp0.IsDetonating() && sp1.IsDetonating()))
+        if (TryDetonate(false))
         {
-            if (sp0.IsDetonating())
-            {
-                sp0.SetDetonate(false);
-                sp1.SetDetonate(true);
-            }
-            else if (sp1.IsDetonating())
-            {
-                sp1.SetDetonate(false);
-                sp0.SetDetonate(true);
-            }
+            sp0.Deselect();
+            sp1.Deselect();
+            await LiftDown();
+            await LiftFromUp();
+            UpdateBoard();
+            return;
         }
-        if (TryDetonate(false)) return;
-        sp0.TryMove(sp1.transform.position, false);
-        sp1.TryMove(sp0.transform.position, false);
-        sp0.Swap(sp1);
+        sp0.TryMove(sp1.transform.position,false,false);
+        sp1.TryMove(sp0.transform.position,false,false);
+        PointSwap(sp0, sp1);
+    }
+
+    private void PointSwap(Point point1, Point point2)
+    {
+        (pointList[point1.x][point1.y], pointList[point2.x][point2.y]) 
+            = (pointList[point2.x][point2.y], pointList[point1.x][point1.y]);
+        (point1.x, point2.x) = (point2.x, point1.x);
+        (point1.y, point2.y) = (point2.y, point1.y);
     }
 
     private void CheckColumn(int x1, int y1)
@@ -171,13 +174,137 @@ public class GameController : MonoBehaviour
                     else
                     {
                         point.Setup(point.x,point.y);
+                        point.SetDetonate(false);
                     }
                     hasDetonated = true;
                 }
-                point.SetDetonate(false);
             }
         }
         return hasDetonated;
+    }
+
+    private async Task LiftDown()
+    {
+        for (var i = 0; i < length; i++)
+        {
+            for (var j = 0; j < length; j++)
+            {
+                if (!pointList[i][j].IsDetonating())
+                {
+                    var detonationsCount = 0;
+                    for (var k = i + 1; k < length; k++)
+                    {
+                        if (pointList[k][j].IsDetonating())
+                        {
+                            detonationsCount++;
+                        }
+                    }
+                    if (detonationsCount > 0)
+                    {
+                        var oldPosition = pointList[i][j].transform.position;
+                        var newPosition = 
+                            new Vector3(oldPosition.x, oldPosition.y - 100 * detonationsCount, 0);
+                        pointList[i][j].x += detonationsCount;
+                        pointList[i][j].TryMove(newPosition,true,false);
+                    }
+                }
+            }
+        }
+        await Task.Delay(TimeSpan.FromSeconds(1));
+    }
+
+    private async Task LiftFromUp()
+    {
+        for (var i = 0; i < length; i++)
+        {
+            for (var j = 0; j < length; j++)
+            {
+                if (pointList[i][j].IsDetonating())
+                {
+                    var detonationsCount = 0;
+                    for (var k = i-1; k > -1; k--)
+                    {
+                        if (!pointList[k][j].IsDetonating())
+                        {
+                            detonationsCount++;
+                        }
+                    }
+                    var oldPosition = pointList[i][j].transform.position;
+                    var newMiddlePosition = 
+                        new Vector3(oldPosition.x, oldPosition.y + 100 * (detonationsCount + 3), 0);
+                    pointList[i][j].x -= detonationsCount;
+                    pointList[i][j].TryMove(newMiddlePosition,true,true);
+                    var newLastPosition = newMiddlePosition + new Vector3(0,-300,0);
+                    pointList[i][j].TryMove(newLastPosition,true,false);
+                }
+            }
+        }
+        for (var i = 0; i < length; i++)
+        {
+            for (var j = 0; j < length; j++)
+            {
+                var point = pointList[i][j];
+                if (point.IsDetonating())
+                {
+                    point.Setup(point.x,point.y);
+                    point.SetDetonate(false);
+                }
+            }
+        }
+        await Task.Delay(TimeSpan.FromSeconds(1));
+    }
+
+    private async void UpdateBoard()
+    {
+        var updatedPointList = new List<List<Point>>();
+        for (var i = 0; i < length; i++)
+        {
+            updatedPointList.Add(new List<Point>());
+        }
+        for (var i = 0; i < length; i++)
+        {
+            for (var j = 0; j < length; j++)
+            {
+                Point newPoint = null;
+                var isFound = false;
+                for (var k = 0; k < length; k++)
+                {
+                    for (var m = 0; m < length; m++)
+                    {
+                        if (pointList[k][m].x == i && pointList[k][m].y == j)
+                        {
+                            isFound = true;
+                            newPoint = pointList[k][m];
+                            break;
+                        }
+                    }
+                    if (isFound) break;
+                }
+                if (newPoint != null)
+                {
+                    updatedPointList[i].Add(newPoint);
+                }
+                else
+                {
+                    throw new ArgumentException("Point not found by X and Y.");
+                }
+            }
+        }
+        pointList = updatedPointList;
+        for (var i = 0; i < length; i++)
+        {
+            for (var j = 0; j < length; j++)
+            {
+                CheckColumn(i, j);
+                CheckRow(i, j);
+            }
+        }
+        while (TryDetonate(false))
+        {
+            await LiftDown();
+            await LiftFromUp();
+            UpdateBoard();
+        }
     }
 
     private void GameOver()

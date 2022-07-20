@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.Serialization;
 using UnityEngine.UI;
 using Random = UnityEngine.Random;
 
@@ -71,24 +70,18 @@ public class Point : MonoBehaviour
     {
         var setupInt = Random.Range(0, 5);
         shape = (Shape)setupInt;
+        image.color = Color.white;
         image.sprite = iconList[setupInt];
         x = x1;
         y = y1;
         startingPosition = transform.position;
     }
 
-    public void Swap(Point pointToSwap)
-    {
-        (x, pointToSwap.x) = (pointToSwap.x, x);
-        (y, pointToSwap.y) = (pointToSwap.y, y);
-        (shape, pointToSwap.shape) = (pointToSwap.shape, shape);
-    }
-
     public async void Detonate()
     {
         image.color = Color.clear;
-        await Task.Delay(TimeSpan.FromSeconds(1f));
         ScoreDetonate?.Invoke();
+        await Task.Delay(TimeSpan.FromSeconds(1f));
     }
     
     public async void Deselect()
@@ -110,7 +103,7 @@ public class Point : MonoBehaviour
         deselectedToken?.Cancel();
     }
 
-    public async void TryMove(Vector3 newPosition, bool isNewStartingPosition)
+    public async void TryMove(Vector3 newPosition, bool isNewStartingPosition, bool moveInstantly)
     {
         if (isNewStartingPosition)
         {
@@ -130,19 +123,26 @@ public class Point : MonoBehaviour
                 await Task.Yield();
             }
         }
-        float movingLerp = 0;
         var oldPosition = gameObject.transform.position;
-        while (movingLerp < 1)
+        if (!moveInstantly)
         {
-            if (movingToken.IsCancellationRequested) return;
+            float movingLerp = 0;
             while (movingLerp < 1)
             {
                 if (movingToken.IsCancellationRequested) return;
-                gameObject.transform.position = Vector3.Lerp(oldPosition, newPosition, movingLerp);
-                movingLerp += Time.deltaTime * 2;
-                await Task.Yield();
+                while (movingLerp < 1)
+                {
+                    if (movingToken.IsCancellationRequested) return;
+                    gameObject.transform.position = Vector3.Lerp(oldPosition, newPosition, movingLerp);
+                    movingLerp += Time.deltaTime * 2;
+                    await Task.Yield();
+                }
+                movingLerp += Time.deltaTime;
             }
-            movingLerp += Time.deltaTime;
+        }
+        else
+        {
+            gameObject.transform.position = newPosition;
         }
     }
     
