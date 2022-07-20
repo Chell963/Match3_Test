@@ -5,42 +5,36 @@ namespace Progress
 {
     public class ProgressModel : MonoBehaviour
     {
+        //Подписки для вьюшки
         public event Action<int> TimeCountdown;
         public event Action<int> ScoreEvent;
-
+        
         public event Action GameOver;
         
-        private float timeSpent;
-        private int score = 0;
+        private float timeLeft = 60;
+        private int score;
 
-        public int GetScore()
-        {
-            return score;
-        }
-
-        public float GetTime()
-        {
-            return timeSpent;
-        }
-    
+        //Подсчет очков
         public void CountScore()
         {
             score += 1;
             ScoreEvent?.Invoke(score);
         }
 
+        //Подсчет времени
         private void Update()
         {
-            if ((int)timeSpent >= 60)
+            if ((int)timeLeft <= 0)
             {
+                TimeCountdown?.Invoke(0);
                 GameOver?.Invoke();
             }
             else
             {
-                timeSpent += Time.deltaTime;
-                if (Mathf.Abs(timeSpent - (int)timeSpent) < 0.3f)
+                timeLeft -= Time.deltaTime;
+                if (Mathf.Abs(timeLeft - (int)timeLeft) < 0.3f)
                 {
-                    TimeCountdown?.Invoke((int)timeSpent);
+                    TimeCountdown?.Invoke((int)timeLeft);
                 }
             }
         }

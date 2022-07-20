@@ -18,6 +18,7 @@ public enum Shape
 public class Point : MonoBehaviour
 {
     public event Action<Point> Selected;
+    //Подписка (прогресс модели) для подсчета очков
     public event Action ScoreDetonate;
 
     [HideInInspector] public int x;
@@ -38,34 +39,26 @@ public class Point : MonoBehaviour
     private CancellationTokenSource movingToken = new CancellationTokenSource();
 
     private Vector2 scaleVector = new Vector2(1.25f, 1.25f);
-    private Vector2 startingPosition;
-    
-    public bool IsEqual(Point point)
-    {
-        return point.x == x && point.y == y;
-    }
 
-    public bool IsSelected()
-    {
-        return isSelected;
-    }
-    
     public bool IsDetonating()
     {
         return isToDetonate;
     }
 
+    //Пометить точку на удаление
     public void SetDetonate(bool isDetonate)
     {
         isToDetonate = isDetonate;
     }
 
+    //Проверка точки на рядом стояющую точку
     public bool IsNear(Point point)
     {
         return (Math.Abs(point.x - x) == 1 && Math.Abs(point.y - y) == 0) 
                || (Math.Abs(point.x - x) == 0 && Math.Abs(point.y - y) == 1);
     }
     
+    //Инициализация точки
     public void Setup(int x1, int y1)
     {
         var setupInt = Random.Range(0, 5);
@@ -74,9 +67,9 @@ public class Point : MonoBehaviour
         image.sprite = iconList[setupInt];
         x = x1;
         y = y1;
-        startingPosition = transform.position;
     }
 
+    //Взрыв точки
     public async void Detonate()
     {
         image.color = Color.clear;
@@ -84,6 +77,7 @@ public class Point : MonoBehaviour
         await Task.Delay(TimeSpan.FromSeconds(1f));
     }
     
+    //Анимация снятия выделения
     public async void Deselect()
     {
         deselectedToken = new CancellationTokenSource();
@@ -103,13 +97,10 @@ public class Point : MonoBehaviour
         deselectedToken?.Cancel();
     }
 
-    public async void TryMove(Vector3 newPosition, bool isNewStartingPosition, bool moveInstantly)
+    //Перемещение на заданную точку в пространстве
+    public async void TryMove(Vector3 newPosition, bool needScaling, bool moveInstantly)
     {
-        if (isNewStartingPosition)
-        {
-            startingPosition = newPosition;
-        }
-        else
+        if (needScaling)
         {
             float scaleLerp = 0;
             var vectorTwo = scaleVector;
@@ -146,6 +137,7 @@ public class Point : MonoBehaviour
         }
     }
     
+    //Выбор точки
     private void Select()
     {
         if (isSelected) return;
@@ -154,6 +146,7 @@ public class Point : MonoBehaviour
         ShowSelection();
     }
 
+    //Анимация выбора точки
     private async void ShowSelection()
     {
         float lerp = 0;
